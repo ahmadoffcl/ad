@@ -18,7 +18,7 @@ import type { D1Database, Ai } from "@cloudflare/workers-types";
 import type { Brand, PlatformId } from "@/lib/types";
 import { getDb, getAI } from "@/lib/db";
 import { getSessionUser, readSessionCookie, newId } from "@/lib/auth";
-import { buildCopilotSystemPrompt, AI_MODEL } from "@/lib/ai/prompts";
+import { buildCopilotSystemPrompt, AI_MODEL, AI_MODEL_FALLBACK } from "@/lib/ai/prompts";
 import { extractJson } from "@/lib/ai";
 import { COPILOT_TOOLS, runTool, executeSchedulePost, type CopilotCtx, type SchedulePostInput } from "@/lib/copilot/tools";
 
@@ -204,17 +204,43 @@ function offlineResponder(
 
 /* ---------------- model call ---------------- */
 
+function coerceText(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map(coerceText).join("\n");
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    if (typeof o.content === "string") return o.content;
+    if (typeof o.text === "string") return o.text;
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return "";
+    }
+  }
+  return String(v);
+}
+
 async function callModel(
   ai: Ai,
   system: string,
   messages: { role: string; content: string }[]
 ): Promise<string> {
-  const out = (await ai.run(AI_MODEL as never, {
+  const opts = {
     messages: [{ role: "system", content: system }, ...messages],
     temperature: 0.7,
     max_tokens: 1200,
-  } as never)) as { response?: string };
-  return out?.response ?? "";
+  } as never;
+  for (const model of [AI_MODEL, AI_MODEL_FALLBACK]) {
+    try {
+      const out = (await ai.run(model as never, opts)) as { response?: unknown };
+      const text = coerceText(out?.response);
+      if (text.trim()) return text;
+    } catch {
+      /* try the fallback model */
+    }
+  }
+  return "";
 }
 
 function parseToolCall(text: string): { tool: string; args: Record<string, unknown> } | null {
