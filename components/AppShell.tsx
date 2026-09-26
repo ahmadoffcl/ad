@@ -11,6 +11,12 @@ import { NotificationsPanel } from "./Notifications";
 import { CopilotLauncher } from "./copilot/CopilotPanel";
 
 const ICONS = {
+  sparkle: (
+    <>
+      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+      <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" />
+    </>
+  ),
   dashboard: (
     <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
   ),
@@ -46,9 +52,10 @@ const ICONS = {
 };
 
 const DESKTOP_NAV = [
-  { href: "/app", label: "Dashboard", icon: ICONS.dashboard },
+  { href: "/app", label: "Agent", icon: ICONS.sparkle },
   { href: "/app/studio", label: "Studio", icon: ICONS.studio },
   { href: "/app/calendar", label: "Calendar", icon: ICONS.calendar },
+  { href: "/app/board", label: "Board", icon: ICONS.dashboard },
   { href: "/app/analytics", label: "Analytics", icon: ICONS.analytics },
   { href: "/app/radar", label: "Radar", icon: ICONS.radar },
   { href: "/app/brands", label: "Brands", icon: ICONS.brands },
@@ -56,7 +63,7 @@ const DESKTOP_NAV = [
 ];
 
 const MOBILE_NAV = [
-  { href: "/app", label: "Home", icon: ICONS.home },
+  { href: "/app", label: "Agent", icon: ICONS.sparkle },
   { href: "/app/studio", label: "Studio", icon: ICONS.studio },
   { href: "/app/calendar", label: "Calendar", icon: ICONS.calendar },
   { href: "/app/radar", label: "Radar", icon: ICONS.radar },

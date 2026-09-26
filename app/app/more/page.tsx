@@ -49,6 +49,12 @@ function Chevron() {
 
 const ROWS = [
   {
+    href: "/app/board",
+    label: "Board",
+    desc: "Pipeline — where work lands",
+    icon: <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />,
+  },
+  {
     href: "/app/analytics",
     label: "Analytics",
     desc: "Scores, reach and saves",

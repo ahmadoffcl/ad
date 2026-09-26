@@ -46,6 +46,39 @@ async function* readSSE(res: Response): AsyncGenerator<SSEEvent> {
   }
 }
 
+function WorkflowChips({
+  brandName,
+  onPick,
+  disabled,
+}: {
+  brandName: string;
+  onPick: (text: string) => void;
+  disabled: boolean;
+}) {
+  const chips = [
+    { label: "Launch a campaign", text: `Launch a campaign for ${brandName} — take it from brief to scheduled posts.` },
+    { label: "Plan this week's posts", text: "Plan this week's posts for me — check what's scheduled and fill the gaps." },
+    { label: "How's my brand doing?", text: `How's ${brandName} doing? Give me the real numbers.` },
+    { label: "What's working in our niche?", text: "What's working in our niche right now? Give me 3 trends I can actually use." },
+  ];
+  return (
+    <div className="mt-5 grid w-full max-w-[420px] grid-cols-2 gap-2">
+      {chips.map((c) => (
+        <button
+          key={c.label}
+          type="button"
+          disabled={disabled}
+          onClick={() => onPick(c.text)}
+          className="pressable rounded-2xl border border-line bg-ink-2 px-3.5 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-molten/50 disabled:opacity-40"
+        >
+          <p className="text-[13px] font-semibold text-paper">{c.label}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-mist">Forge runs it end-to-end</p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function SuggestionChips({
   brandName,
   onPick,
@@ -267,14 +300,14 @@ export function CopilotPanel({
           F
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-sm font-bold leading-tight">Forge Copilot</p>
-          <p className="text-[11px] text-fog">AI copilot · {activeBrand.name}</p>
+          <p className="font-display text-sm font-bold leading-tight">Forge</p>
+          <p className="text-[11px] text-fog">Your ad agent · {activeBrand.name}</p>
         </div>
         {variant === "panel" && (
           <Link
-            href="/app/copilot"
+            href="/app"
             className="pressable rounded-lg p-2 text-fog transition-colors hover:bg-ink-3 hover:text-paper"
-            aria-label="Open full copilot view"
+            aria-label="Open Forge full view"
             title="Open full view"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -299,18 +332,19 @@ export function CopilotPanel({
       {/* messages */}
       <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {empty && (
-          <div className="flex h-full flex-col items-center justify-center text-center">
+          <div className="flex h-full flex-col items-center justify-center px-2 py-6 text-center">
             <span
               aria-hidden="true"
               className="flex h-14 w-14 items-center justify-center rounded-2xl bg-molten font-display text-2xl font-bold text-ink"
             >
               F
             </span>
-            <p className="mt-4 font-display text-base font-bold">I&apos;m Forge — your copilot.</p>
-            <p className="mt-1.5 max-w-[260px] text-sm leading-relaxed text-fog">
-              I draft concepts, score hooks, write captions, and keep an eye on
-              your numbers. I propose — you approve.
+            <p className="mt-4 font-display text-base font-bold">I&apos;m Forge — your ad agent.</p>
+            <p className="mt-1.5 max-w-[300px] text-sm leading-relaxed text-fog">
+              Brief me once. I draft the concepts, score the hooks, write the
+              captions and queue the posts. You just approve.
             </p>
+            <WorkflowChips brandName={activeBrand.name} onPick={send} disabled={busy} />
           </div>
         )}
         {messages.map((m) => (
