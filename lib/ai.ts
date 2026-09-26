@@ -71,18 +71,26 @@ async function runModel(
     { role: "user", content: user },
   ];
   const opts = { messages, temperature, max_tokens: maxTokens };
+  let firstErr: unknown = null;
   try {
     const out = (await ai.run(AI_MODEL as never, opts as never)) as {
       response?: string;
     };
     if (out?.response) return out.response;
-  } catch {
-    /* fall through to fallback model */
+    firstErr = new Error(`primary model ${AI_MODEL} returned empty response`);
+  } catch (e) {
+    firstErr = e;
   }
-  const out2 = (await ai.run(AI_MODEL_FALLBACK as never, opts as never)) as {
-    response?: string;
-  };
-  return out2?.response ?? "";
+  try {
+    const out2 = (await ai.run(AI_MODEL_FALLBACK as never, opts as never)) as {
+      response?: string;
+    };
+    if (out2?.response) return out2.response;
+    throw new Error(`fallback model ${AI_MODEL_FALLBACK} returned empty response`);
+  } catch (e2) {
+    const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 280);
+    throw new Error(`AI models failed — primary: ${msg(firstErr)}; fallback: ${msg(e2)}`);
+  }
 }
 
 /** Extract the first balanced JSON object from model output. */
@@ -225,6 +233,8 @@ export interface GenerateResult {
   concepts: AdConcept[];
   source: AiSource;
   critique?: string;
+  /** Populated when the model call failed — lets the client show why it fell back. */
+  aiError?: string;
 }
 
 /**
@@ -241,15 +251,18 @@ export async function generateConceptsAI(
   const system = buildConceptsSystemPrompt(brand, prefs);
 
   let drafts: DraftConcept[] = [];
+  let aiError: string | undefined;
   try {
     const raw = await runModel(ai, system, buildConceptsDraftPrompt(brief, brand, prefs), temperature, 2200);
     const parsed = extractJson(raw) as { concepts?: DraftConcept[] } | null;
     if (parsed?.concepts?.length) drafts = parsed.concepts.slice(0, 3);
-  } catch {
+    else aiError = "model returned no parseable concepts";
+  } catch (e) {
     drafts = [];
+    aiError = (e instanceof Error ? e.message : String(e)).slice(0, 400);
   }
   if (drafts.length === 0) {
-    return { concepts: generateConcepts(brief, brand), source: "deterministic" };
+    return { concepts: generateConcepts(brief, brand), source: "deterministic", aiError };
   }
 
   // Self-critique pass: the model scores its drafts and rewrites the weakest.
