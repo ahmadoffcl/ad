@@ -1,5 +1,10 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect } from "react";
 
 export default function CopilotRedirect() {
-  redirect("/app");
+  useEffect(() => {
+    window.location.replace("/app");
+  }, []);
+  return null;
 }
