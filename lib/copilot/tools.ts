@@ -59,6 +59,24 @@ function str(v: unknown, fallback = ""): string {
   return typeof v === "string" && v.trim() ? v.trim() : fallback;
 }
 
+/** Models don't always use our exact parameter names — try sensible aliases. */
+function pick(args: Record<string, unknown>, keys: string[], fallback = ""): string {
+  for (const k of keys) {
+    const v = str(args[k]);
+    if (v) return v;
+  }
+  return fallback;
+}
+
+function pickList(args: Record<string, unknown>, keys: string[]): unknown {
+  for (const k of keys) {
+    const v = args[k];
+    if (Array.isArray(v) && v.length) return v;
+    if (typeof v === "string" && v.trim()) return v;
+  }
+  return undefined;
+}
+
 function platformList(v: unknown): PlatformId[] {
   const valid: PlatformId[] = ["ig-feed", "ig-reel", "ig-story", "tiktok", "shorts", "x"];
   if (!Array.isArray(v)) return ["ig-feed"];
@@ -161,15 +179,21 @@ const create_brief: CopilotTool = {
   },
   label: "Saving your brief…",
   async run(args, ctx) {
-    const brief = str(args.brief);
-    const product = str(args.product);
-    const objective = str(args.objective) || "awareness";
-    const audience = str(args.audience);
-    const placements = platformList(args.placements);
-    const payload = { brief, product, objective, audience, placements };
+    // Alias-tolerant: the model may say summary/goal instead of brief/objective.
+    const product = pick(args, ["product", "item", "name"]);
+    const objective = pick(args, ["objective", "goal"], "awareness");
+    const audience = pick(args, ["audience", "for"]);
+    const offer = pick(args, ["offer", "deal"]);
+    const placements = platformList(pickList(args, ["placements", "platforms"]));
+    let brief = pick(args, ["brief", "summary", "title", "headline"]);
     if (!brief) {
-      return { ok: false, summary: "A brief needs a one-line summary — got an empty string.", data: {} };
+      // Compose it from the parts rather than failing — the user gave us the ingredients.
+      const bits = [product, objective !== "awareness" ? objective : "", audience ? `for ${audience}` : "", offer]
+        .filter(Boolean)
+        .join(" · ");
+      brief = bits || "New campaign";
     }
+    const payload = { brief, product, objective, audience, placements, offer };
     if (!ctx.db || !ctx.userId) {
       return {
         ok: false,
@@ -196,11 +220,11 @@ const create_brief: CopilotTool = {
 
 function buildBriefFromArgs(args: Record<string, unknown>, brandId: string): Brief {
   return {
-    product: str(args.product) || str(args.brief) || "the product",
-    audience: str(args.audience) || "the brand's audience",
-    goal: str(args.objective) || str(args.goal) || "awareness",
-    offer: str(args.offer),
-    platforms: platformList(args.placements ?? args.platforms),
+    product: pick(args, ["product", "item", "brief", "summary"]) || "the product",
+    audience: pick(args, ["audience", "for"]) || "the brand's audience",
+    goal: pick(args, ["objective", "goal"]) || "awareness",
+    offer: pick(args, ["offer", "deal"]),
+    platforms: platformList(pickList(args, ["placements", "platforms"])),
     brandId,
     trendAngle: str(args.trendAngle) || undefined,
   };
@@ -266,8 +290,8 @@ const score_hook: CopilotTool = {
   },
   label: "Scoring your hook…",
   async run(args, ctx) {
-    const headline = str(args.headline);
-    const sub = str(args.sub);
+    const headline = pick(args, ["headline", "text", "hook", "line"]);
+    const sub = pick(args, ["sub", "subline", "caption"]);
     if (!headline) return { ok: false, summary: "No headline provided to score.", data: {} };
     if (ctx.ai) {
       const r = await scoreHookAI(ctx.ai, headline, sub);
@@ -303,10 +327,10 @@ const write_caption: CopilotTool = {
   },
   label: "Writing the caption…",
   async run(args, ctx) {
-    const platform = platformList([args.platform])[0];
-    const headline = str(args.headline);
-    const sub = str(args.sub);
-    const cta = str(args.cta) || "Shop now";
+    const platform = platformList(pickList(args, ["platform", "placement"]))[0];
+    const headline = pick(args, ["headline", "text", "hook", "concept"]);
+    const sub = pick(args, ["sub", "subline"]);
+    const cta = pick(args, ["cta"], "Shop now");
     if (!headline) return { ok: false, summary: "Need a headline to write a caption from.", data: {} };
     const meta = platformMeta(platform);
     let caption: string;

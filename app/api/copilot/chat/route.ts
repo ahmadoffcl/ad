@@ -370,6 +370,9 @@ export async function POST(req: Request): Promise<Response> {
         const cards: unknown[] = [];
         let finalText = "";
         let stoppedForConfirm = false;
+        // Loop guard: nudge the model forward if it repeats the same tool.
+        let lastTool = "";
+        let repeatCount = 0;
 
         for (let step = 0; step < MAX_STEPS; step++) {
           let reply: string;
@@ -390,6 +393,22 @@ export async function POST(req: Request): Promise<Response> {
             break;
           }
 
+          if (toolCall.tool === lastTool) {
+            repeatCount++;
+            if (repeatCount >= 2) {
+              convo.push({
+                role: "user",
+                content: `You've called ${toolCall.tool} ${repeatCount + 1} times in a row. Move on: use the results you already have, call the NEXT tool in the workflow, or summarize for the user. Do not call ${toolCall.tool} again.`,
+              });
+              lastTool = "";
+              repeatCount = 0;
+              continue;
+            }
+          } else {
+            lastTool = toolCall.tool;
+            repeatCount = 0;
+          }
+
           const def = COPILOT_TOOLS.find((t) => t.name === toolCall.tool);
           if (!def) {
             convo.push({
@@ -399,8 +418,6 @@ export async function POST(req: Request): Promise<Response> {
             continue;
           }
           send({ type: "tool", name: def.name, label: def.label });
-          // TEMP DEBUG — remove after diagnosing arg shape
-          send({ type: "debug", tool: toolCall.tool, args: toolCall.args });
 
           let toolRes: Awaited<ReturnType<typeof runTool>>["result"];
           try {
