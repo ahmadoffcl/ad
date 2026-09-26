@@ -1,0 +1,33 @@
+import type { Metadata } from "next";
+import { Space_Grotesk, Inter } from "next/font/google";
+import "./globals.css";
+
+const display = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
+});
+
+const body = Inter({
+  subsets: ["latin"],
+  variable: "--font-body",
+  weight: ["400", "500", "600", "700"],
+});
+
+export const metadata: Metadata = {
+  title: "AdForge — Ads people don't skip",
+  description:
+    "AdForge is the end-to-end ad studio: brief once, get platform-native campaigns, pass the Slop Shield, and post everywhere on autopilot.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
+      <body className="font-body">{children}</body>
+    </html>
+  );
+}
