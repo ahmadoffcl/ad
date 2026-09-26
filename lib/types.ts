@@ -37,6 +37,7 @@ export interface Brand {
   tone: string;
   voice: string[];
   banned: string[];
+  director?: DirectorPrefs;
 }
 
 export interface ScorePart {
@@ -244,3 +245,16 @@ export const AVATAR_COLORS = [
   "#fbbf24",
   "#94a3b8",
 ];
+
+/* ---------------- director's controls ---------------- */
+
+/** Per-brand generation preferences — the human is the director, AI is the crew. */
+export interface DirectorPrefs {
+  tone: string;
+  hookStyle: "auto" | "question" | "bold-claim" | "story" | "stat";
+  ctaType: "auto" | "shop" | "learn" | "follow" | "comment";
+  captionLength: "short" | "medium" | "long";
+  emoji: boolean;
+  creativity: number; // 0–100 slider → temperature
+  avoid: string; // negative prompt
+}

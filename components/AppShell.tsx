@@ -8,6 +8,7 @@ import { useForge } from "@/lib/store";
 import CommandPalette from "./CommandPalette";
 import Onboarding from "./Onboarding";
 import { NotificationsPanel } from "./Notifications";
+import { CopilotLauncher } from "./copilot/CopilotPanel";
 
 const ICONS = {
   dashboard: (
@@ -318,6 +319,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <CommandPalette />
       <NotificationsPanel />
       <Onboarding />
+      <CopilotLauncher />
     </div>
   );
 }

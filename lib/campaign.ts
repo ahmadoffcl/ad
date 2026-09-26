@@ -387,7 +387,7 @@ const GOAL_BANKS: Record<string, Angle[]> = {
 
 /* ---------- generation ---------- */
 
-function buildCaption(
+export function buildCaption(
   platform: PlatformId,
   headline: string,
   sub: string,

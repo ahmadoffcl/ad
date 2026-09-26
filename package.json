@@ -1,1 +1,37 @@
-{"dependencies":{"next":"14.2.18","react":"18.3.1","react-dom":"18.3.1"},"description":"AdForge — end-to-end ad creation and social posting studio. Ads people don't skip.","devDependencies":{"@types/node":"20.16.0","@types/react":"18.3.3","@types/react-dom":"18.3.0","autoprefixer":"10.4.20","postcss":"8.4.45","tailwindcss":"3.4.10","typescript":"5.5.4"},"engines":{"node":">=18.17.0"},"name":"adforge","private":true,"scripts":{"build":"next build","dev":"next dev","start":"next start"},"version":"0.1.0"}
+{
+  "dependencies": {
+    "next": "14.2.18",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "description": "AdForge — end-to-end ad creation and social posting studio. Ads people don't skip.",
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "1.12.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@types/node": "20.16.0",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.45",
+    "tailwindcss": "3.4.10",
+    "typescript": "5.5.4",
+    "wrangler": "^3.114.17"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "name": "adforge",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "pages:build": "next-on-pages",
+    "deploy": "npm run pages:build && wrangler pages deploy",
+    "db:migrate": "wrangler d1 migrations apply adforge-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply adforge-db --local",
+    "postinstall": "node scripts/patch-next-on-pages.mjs"
+  },
+  "version": "0.1.0"
+}

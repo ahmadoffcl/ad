@@ -235,14 +235,20 @@ function ApiKeys() {
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  const [freshSecret, setFreshSecret] = useState<string | null>(null);
 
-  const submit = () => {
+  const submit = async () => {
     const clean = name.trim();
     if (!clean) return;
-    const key = generateApiKey(clean);
+    const key = await generateApiKey(clean);
     setName("");
     setNaming(false);
-    push("API key generated", { body: `${key.prefix}… — copy it now.`, kind: "success" });
+    if (key.secret) {
+      setFreshSecret(key.secret);
+      push("API key generated", { body: "Copy it now — you won't see it again.", kind: "success" });
+    } else {
+      push("API key generated", { body: `${key.prefix}… — copy it now.`, kind: "success" });
+    }
   };
 
   const copy = async (prefix: string) => {
@@ -282,6 +288,16 @@ function ApiKeys() {
           />
           <Btn variant="primary" size="sm" onClick={submit} disabled={!name.trim()}>Create</Btn>
           <Btn variant="ghost" size="sm" onClick={() => { setNaming(false); setName(""); }}>Cancel</Btn>
+        </div>
+      )}
+
+      {freshSecret && (
+        <div className="mb-4 rounded-2xl border border-molten/40 bg-molten-wash/60 p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-molten">Copy it now — you won&rsquo;t see it again</p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 break-all rounded-xl bg-ink px-3 py-2 font-mono text-xs text-paper">{freshSecret}</code>
+            <Btn variant="primary" size="sm" onClick={() => { copy(freshSecret); setFreshSecret(null); }}>Copy &amp; close</Btn>
+          </div>
         </div>
       )}
 

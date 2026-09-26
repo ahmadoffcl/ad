@@ -1,0 +1,17 @@
+# AdForge on Cloudflare Pages + Workers AI + D1.
+#
+# D1 database `adforge-db` is bound below (id 54863a4f-e405-4bb0-a20c-11fa044f1fe2).
+#   npm run db:migrate   — apply migrations/ to the remote D1 database
+#   npm run deploy       — build + deploy to Cloudflare Pages
+
+name = "adforge"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "adforge-db"
+database_id = "54863a4f-e405-4bb0-a20c-11fa044f1fe2"
+
+[ai]
+binding = "AI"

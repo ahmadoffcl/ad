@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForge } from "@/lib/store";
 import { useToast } from "@/lib/toast";
 import { Avatar } from "@/components/AppShell";
@@ -81,8 +82,9 @@ const ROWS = [
 ];
 
 export default function MorePage() {
-  const { profile } = useForge();
+  const { profile, logout, mode } = useForge();
   const { push } = useToast();
+  const router = useRouter();
   const [greeting, setGreeting] = useState("Welcome back");
 
   useEffect(() => {
@@ -90,11 +92,17 @@ export default function MorePage() {
     setGreeting(h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening");
   }, []);
 
-  const signOut = () =>
-    push("Signed out (demo)", {
-      body: "Demo workspace — your forge is exactly as you left it.",
-      kind: "info",
-    });
+  const signOut = async () => {
+    await logout();
+    if (mode === "cloud") {
+      router.push("/login");
+    } else {
+      push("Signed out (demo)", {
+        body: "Demo workspace — your forge is exactly as you left it.",
+        kind: "info",
+      });
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-lg animate-fade-up space-y-6">

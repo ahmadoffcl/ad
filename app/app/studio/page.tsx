@@ -3,13 +3,67 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForge } from "@/lib/store";
-import { GOALS, type AdConcept, type Aspect, type PlatformId } from "@/lib/types";
+import { GOALS, type AdConcept, type Aspect, type DirectorPrefs, type PlatformId } from "@/lib/types";
 import { PLATFORMS, generateConcepts, platformMeta } from "@/lib/campaign";
+import {
+  generateConcepts as generateConceptsRemote,
+  scoreHook as scoreHookRemote,
+  writeCaption as writeCaptionRemote,
+  type AISource,
+} from "@/lib/aiClient";
 import AdCanvas from "@/components/AdCanvas";
 import PhoneMock from "@/components/PhoneMock";
 import ScoreBars from "@/components/ScoreBars";
 import SlopPanel from "@/components/SlopPanel";
 import { Btn, Card, Field, Pill, ScoreRing, SectionHead } from "@/components/ui";
+
+/** Honest badge: where did these words come from? */
+function SourceBadge({ source }: { source: AISource | null }) {
+  if (!source) return null;
+  const tone = source === "ai" ? "accent" : source === "mixed" ? "amber" : undefined;
+  const label =
+    source === "ai" ? "AI-written" : source === "mixed" ? "AI + QC" : "Deterministic";
+  const hint =
+    source === "ai"
+      ? "Drafted by Workers AI, shielded before you saw it"
+      : source === "mixed"
+        ? "AI draft rescued by deterministic QC"
+        : "Same brief, same campaign — no model involved";
+  return (
+    <span title={hint}>
+      <Pill tone={tone}>{label}</Pill>
+    </span>
+  );
+}
+
+function Seg<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            value === o.id
+              ? "border-molten/60 bg-molten-wash text-molten-soft"
+              : "border-line bg-ink-3 text-fog hover:border-mist/60 hover:text-paper"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type Step = "brief" | "concepts" | "detail";
 
@@ -34,7 +88,7 @@ function StudioInner() {
   const forge = useForge();
   const {
     activeBrand, trends, settings, addPipelineItem, setPipelineStage,
-    setGate, schedulePosts, pushActivity,
+    setGate, schedulePosts, pushActivity, updateBrand,
   } = forge;
   const searchParams = useSearchParams();
   const trendParam = searchParams.get("trend");
@@ -52,6 +106,31 @@ function StudioInner() {
   const [concepts, setConcepts] = useState<AdConcept[]>([]);
   const [selIdx, setSelIdx] = useState(0);
   const [aspect, setAspect] = useState<Aspect>("9:16");
+
+  /* ---- director's chair (persisted per brand) ---- */
+  const d0 = activeBrand.director;
+  const [tone, setTone] = useState(d0?.tone ?? "bold, minimal");
+  const [hookStyle, setHookStyle] = useState<DirectorPrefs["hookStyle"]>(d0?.hookStyle ?? "auto");
+  const [ctaType, setCtaType] = useState<DirectorPrefs["ctaType"]>(d0?.ctaType ?? "auto");
+  const [captionLength, setCaptionLength] = useState<DirectorPrefs["captionLength"]>(d0?.captionLength ?? "short");
+  const [emoji, setEmoji] = useState(d0?.emoji ?? true);
+  const [creativity, setCreativity] = useState(d0?.creativity ?? 55);
+  const [avoid, setAvoid] = useState(d0?.avoid ?? "");
+
+  /* ---- AI generation state ---- */
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [source, setSource] = useState<AISource | null>(null);
+  const [aiCaptioning, setAiCaptioning] = useState(false);
+  const [secondOpinion, setSecondOpinion] = useState<{
+    deterministic: number;
+    ai: number | null;
+    reason: string;
+    blended: number;
+    source: AISource;
+  } | null>(null);
+  const [scoring, setScoring] = useState(false);
+  const [editingCopy, setEditingCopy] = useState(false);
   const [tab, setTab] = useState<PlatformId>("ig-reel");
   const [edits, setEdits] = useState<Record<string, { caption: string; hashtags: string }>>({});
   const [hiddenLayers, setHiddenLayers] = useState<string[]>([]);
@@ -79,7 +158,34 @@ function StudioInner() {
 
   const canGenerate = product.trim().length > 1 && platforms.length > 0;
 
-  const doGenerate = () => {
+  const directorPrefs = (): DirectorPrefs => ({
+    tone: tone.trim() || "bold, minimal",
+    hookStyle,
+    ctaType,
+    captionLength,
+    emoji,
+    creativity,
+    avoid: avoid.trim(),
+  });
+
+  const resetAfterGenerate = (out: AdConcept[]) => {
+    setConcepts(out);
+    setSelIdx(0);
+    setTab(out[0].variants[0]?.platform ?? "ig-feed");
+    setEdits({});
+    setHiddenLayers([]);
+    setOverridden(false);
+    setPipelineId(null);
+    setSecondOpinion(null);
+    setEditingCopy(false);
+    setAspect("9:16");
+    setStep("concepts");
+  };
+
+  const doGenerate = async () => {
+    const prefs = directorPrefs();
+    // Director's chair persists per brand — the AI reads it on every run.
+    updateBrand(activeBrand.id, { director: prefs });
     const brief = {
       product: product.trim(),
       audience: audience.trim() || "everyone",
@@ -89,17 +195,74 @@ function StudioInner() {
       brandId: activeBrand.id,
       trendAngle: trendAngle || undefined,
     };
-    const out = generateConcepts(brief, activeBrand);
-    setConcepts(out);
-    setSelIdx(0);
-    setTab(out[0].variants[0]?.platform ?? "ig-feed");
-    setEdits({});
-    setHiddenLayers([]);
-    setOverridden(false);
-    setPipelineId(null);
-    setAspect("9:16");
-    setStep("concepts");
-    pushActivity(`3 concepts generated from brief “${brief.product.slice(0, 40)}”`, "concept");
+    setGenerating(true);
+    setGenError(null);
+    try {
+      const r = await generateConceptsRemote(activeBrand, brief, prefs);
+      const out = r.concepts.length ? r.concepts : generateConcepts(brief, activeBrand);
+      setSource(r.concepts.length ? r.source : "deterministic");
+      resetAfterGenerate(out);
+      pushActivity(
+        `3 concepts forged from brief “${brief.product.slice(0, 40)}” · ${r.concepts.length ? r.source : "deterministic"}`,
+        "concept"
+      );
+    } catch (e) {
+      const out = generateConcepts(brief, activeBrand);
+      setSource("deterministic");
+      resetAfterGenerate(out);
+      setGenError(
+        e instanceof Error
+          ? e.message
+          : "The AI engine didn't answer — deterministic concepts instead. Nothing was lost."
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  /** Edit headline / sub / CTA before approval — the director's final say. */
+  const patchConcept = (patch: Partial<Pick<AdConcept, "headline" | "sub" | "cta">>) => {
+    setConcepts((cs) => cs.map((c, i) => (i === selIdx ? { ...c, ...patch } : c)));
+  };
+
+  const doAiCaption = async () => {
+    if (!concept || !variant) return;
+    setAiCaptioning(true);
+    try {
+      const r = await writeCaptionRemote(
+        activeBrand,
+        concept.headline,
+        concept.sub,
+        concept.cta,
+        variant.platform
+      );
+      setEdit({ caption: r.caption, hashtags: r.hashtags.join(" ") });
+      pushActivity(`AI caption written for ${platformMeta(variant.platform).short} · ${r.source}`, "concept");
+    } catch (e) {
+      pushActivity(
+        `AI caption failed — ${e instanceof Error ? e.message : "engine offline"}`,
+        "system"
+      );
+    } finally {
+      setAiCaptioning(false);
+    }
+  };
+
+  const doSecondOpinion = async () => {
+    if (!concept) return;
+    setScoring(true);
+    try {
+      const r = await scoreHookRemote(concept.headline, concept.sub);
+      setSecondOpinion({
+        deterministic: r.deterministic,
+        ai: r.ai ? r.ai.score : null,
+        reason: r.ai?.reason ?? "",
+        blended: r.blended,
+        source: r.source,
+      });
+    } finally {
+      setScoring(false);
+    }
   };
 
   const openConcept = (i: number) => {
@@ -264,14 +427,121 @@ function StudioInner() {
               })}
             </div>
           </Field>
-          <div className="flex items-center justify-between border-t border-line pt-5">
+          <div className="rounded-2xl border border-line bg-ink-2 p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="h-display text-base">Director&rsquo;s chair</h3>
+                <p className="text-xs text-mist">Your taste, saved to {activeBrand.name} — the AI directs from this.</p>
+              </div>
+              <Pill tone="accent">per brand</Pill>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Tone" hint="How the copy should sound.">
+                <input
+                  className="input"
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                  placeholder="bold, minimal"
+                />
+              </Field>
+              <Field label="Never say" hint="Words and vibes to ban, on top of the brand kit.">
+                <input
+                  className="input"
+                  value={avoid}
+                  onChange={(e) => setAvoid(e.target.value)}
+                  placeholder="luxury, elevate, game-changer…"
+                />
+              </Field>
+              <Field label="Hook style">
+                <Seg
+                  value={hookStyle}
+                  onChange={setHookStyle}
+                  options={[
+                    { id: "auto", label: "Auto" },
+                    { id: "question", label: "Question" },
+                    { id: "bold-claim", label: "Bold claim" },
+                    { id: "story", label: "Story" },
+                    { id: "stat", label: "Stat" },
+                  ]}
+                />
+              </Field>
+              <Field label="Call to action">
+                <Seg
+                  value={ctaType}
+                  onChange={setCtaType}
+                  options={[
+                    { id: "auto", label: "Auto" },
+                    { id: "shop", label: "Shop" },
+                    { id: "learn", label: "Learn" },
+                    { id: "follow", label: "Follow" },
+                    { id: "comment", label: "Comment" },
+                  ]}
+                />
+              </Field>
+              <Field label="Caption length">
+                <Seg
+                  value={captionLength}
+                  onChange={setCaptionLength}
+                  options={[
+                    { id: "short", label: "Short" },
+                    { id: "medium", label: "Medium" },
+                    { id: "long", label: "Long" },
+                  ]}
+                />
+              </Field>
+              <div className="flex items-end justify-between gap-4">
+                <Field label="Emoji">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={emoji}
+                    onClick={() => setEmoji((v) => !v)}
+                    className={`relative h-7 w-12 rounded-full transition-colors ${emoji ? "bg-molten" : "bg-ink-4"}`}
+                  >
+                    <span
+                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${emoji ? "left-6" : "left-1"}`}
+                    />
+                  </button>
+                </Field>
+                <div className="flex-1">
+                  <Field
+                    label={`Creativity · ${creativity}`}
+                    hint={creativity < 35 ? "Safe, on-brief" : creativity < 70 ? "Balanced" : "Wild, surprising"}
+                  >
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={creativity}
+                      onChange={(e) => setCreativity(Number(e.target.value))}
+                      className="w-full accent-[#FF5A1F]"
+                      aria-label="Creativity"
+                    />
+                  </Field>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-line pt-5">
             <p className="text-xs text-mist">
-              Brand: <span className="font-bold text-paper">{activeBrand.name}</span> · deterministic — same brief, same campaign
+              Brand: <span className="font-bold text-paper">{activeBrand.name}</span> · AI-drafted, shield-checked
             </p>
-            <Btn disabled={!canGenerate} onClick={doGenerate} className="!px-7 !py-3">
-              Generate 3 concepts →
+            <Btn disabled={!canGenerate || generating} onClick={doGenerate} className="!px-7 !py-3">
+              {generating ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink/30 border-t-ink" />
+                  Forging…
+                </span>
+              ) : (
+                "Generate 3 concepts →"
+              )}
             </Btn>
           </div>
+          {genError && (
+            <p role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              {genError}
+            </p>
+          )}
         </Card>
       </div>
     );
@@ -285,7 +555,15 @@ function StudioInner() {
           kicker="Studio · Concepts"
           title="Pick your killer."
           sub={`Three directions for “${product}” — scored, shielded, ready to open.`}
-          action={<Btn variant="ghost" size="sm" onClick={() => setStep("brief")}>← Tweak brief</Btn>}
+          action={
+            <div className="flex items-center gap-2">
+              <SourceBadge source={source} />
+              <Btn variant="ghost" size="sm" onClick={() => setStep("brief")}>← Tweak brief</Btn>
+              <Btn variant="ghost" size="sm" onClick={doGenerate} disabled={generating}>
+                {generating ? "Forging…" : "↻ Regenerate"}
+              </Btn>
+            </div>
+          }
         />
         <div className="grid gap-4 md:grid-cols-3">
           {concepts.map((c, i) => (
@@ -339,8 +617,49 @@ function StudioInner() {
         kicker={`Studio · ${concept.name}`}
         title={concept.headline}
         sub={concept.angle}
-        action={<Btn variant="ghost" size="sm" onClick={() => setStep("concepts")}>← All concepts</Btn>}
+        action={
+          <div className="flex items-center gap-2">
+            <SourceBadge source={source} />
+            <Btn variant="ghost" size="sm" onClick={() => setEditingCopy((v) => !v)}>
+              {editingCopy ? "Done editing" : "✎ Edit copy"}
+            </Btn>
+            <Btn variant="ghost" size="sm" onClick={() => setStep("concepts")}>← All concepts</Btn>
+          </div>
+        }
       />
+
+      {editingCopy && (
+        <Card className="mb-4 space-y-4 p-4 sm:p-5 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <h3 className="h-display text-base">Edit the words</h3>
+            <Pill tone="accent">director&rsquo;s cut</Pill>
+          </div>
+          <Field label="Headline" hint="First two seconds. Under 8 words wins.">
+            <input
+              className="input font-display text-[15px] font-bold"
+              value={concept.headline}
+              onChange={(e) => patchConcept({ headline: e.target.value })}
+            />
+          </Field>
+          <Field label="Subhead">
+            <input
+              className="input"
+              value={concept.sub}
+              onChange={(e) => patchConcept({ sub: e.target.value })}
+            />
+          </Field>
+          <Field label="CTA">
+            <input
+              className="input"
+              value={concept.cta}
+              onChange={(e) => patchConcept({ cta: e.target.value })}
+            />
+          </Field>
+          <p className="text-xs text-mist">
+            Edited copy is re-scored below — the shield never sleeps.
+          </p>
+        </Card>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
         {/* left: preview + layers */}
@@ -435,7 +754,12 @@ function StudioInner() {
         {/* right: variants, score, shield, actions */}
         <div className="space-y-4">
           <Card className="p-4 sm:p-5">
-            <h3 className="h-display mb-3 text-base">Platform variant</h3>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="h-display text-base">Platform variant</h3>
+              <Btn variant="ghost" size="sm" onClick={doAiCaption} disabled={aiCaptioning}>
+                {aiCaptioning ? "Writing…" : "✨ AI caption"}
+              </Btn>
+            </div>
             <div className="mb-4 flex flex-wrap gap-1.5">
               {concept.variants.map((v) => (
                 <button
@@ -477,8 +801,35 @@ function StudioInner() {
           </Card>
 
           <Card className="p-4 sm:p-5">
-            <h3 className="h-display mb-3 text-base">Hook Score</h3>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="h-display text-base">Hook Score</h3>
+              <Btn variant="ghost" size="sm" onClick={doSecondOpinion} disabled={scoring}>
+                {scoring ? "Asking…" : "AI second opinion"}
+              </Btn>
+            </div>
             <ScoreBars hook={concept.hook} />
+            {secondOpinion && (
+              <div className="mt-3 rounded-xl border border-line bg-ink-2 p-3 animate-fade-in">
+                <div className="flex items-center gap-3">
+                  <ScoreRing score={secondOpinion.blended} size={40} />
+                  <div>
+                    <p className="text-sm font-bold text-paper">
+                      AI second opinion: {secondOpinion.blended}
+                      <span className="ml-2 font-normal text-mist">
+                        (engine {secondOpinion.deterministic}
+                        {secondOpinion.ai !== null && ` · model ${secondOpinion.ai}`})
+                      </span>
+                    </p>
+                    {secondOpinion.reason && (
+                      <p className="mt-0.5 text-xs text-fog">“{secondOpinion.reason}”</p>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] text-mist">
+                  Blended 60/40 deterministic/AI · <SourceBadge source={secondOpinion.source} />
+                </p>
+              </div>
+            )}
           </Card>
 
           <Card className="p-4 sm:p-5">
