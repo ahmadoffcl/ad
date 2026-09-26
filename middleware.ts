@@ -23,7 +23,7 @@ export function middleware(req: NextRequest) {
   }
 
   if (pathname.startsWith("/app")) {
-    const hasSession = req.cookies.get("af_session")?.value;
+    const hasSession = req.cookies.get("adforge_session")?.value;
     // Only redirect when we can tell this is a deployed environment where
     // sessions are real. Localhost keeps the offline demo experience.
     const host = req.headers.get("host") || "";
