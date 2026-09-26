@@ -399,6 +399,8 @@ export async function POST(req: Request): Promise<Response> {
             continue;
           }
           send({ type: "tool", name: def.name, label: def.label });
+          // TEMP DEBUG — remove after diagnosing arg shape
+          send({ type: "debug", tool: toolCall.tool, args: toolCall.args });
 
           let toolRes: Awaited<ReturnType<typeof runTool>>["result"];
           try {
