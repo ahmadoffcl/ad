@@ -151,9 +151,9 @@ const list_campaigns: CopilotTool = {
 const create_brief: CopilotTool = {
   name: "create_brief",
   description:
-    "Save a new creative brief as an 'ideas'-stage campaign in the account.",
+    "Save a new creative brief as an 'ideas'-stage campaign in the account. ALWAYS compose the one-line brief summary yourself from what the user said (e.g. 'KOVA Court Low drop: launch hype for sneakerheads, early access offer') — never ask the user to write it.",
   parameters: {
-    brief: { type: "string", description: "One-line brief name/summary.", required: true },
+    brief: { type: "string", description: "One-line brief summary — you compose this from the user's message.", required: true },
     product: { type: "string", description: "Product being advertised." },
     objective: { type: "string", description: "Goal: launch, sales, awareness, retention." },
     audience: { type: "string", description: "Target audience." },
