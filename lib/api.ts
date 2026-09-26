@@ -73,6 +73,11 @@ export const api = {
 
   /* ---------------- brands ---------------- */
   listBrands: () => req<{ brands: Brand[] }>("/api/brands"),
+  createBrand: (brand: Omit<Brand, "id">) =>
+    reqThrow<{ brand: Brand }>("/api/brands", {
+      method: "POST",
+      body: JSON.stringify(brand),
+    }),
   putBrand: (id: string, patch: Partial<Brand>) =>
     req(`/api/brands/${id}`, { method: "PUT", body: JSON.stringify(patch) }),
 

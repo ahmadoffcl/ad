@@ -71,6 +71,7 @@ interface ForgeContextValue extends ForgeState {
   setActiveBrand: (id: string) => void;
   updateBrand: (id: string, patch: Partial<Brand>) => void;
   updateBrandColors: (id: string, colors: Partial<Brand["colors"]>) => void;
+  createBrand: (input: { name: string; tagline?: string; industry?: string }) => Promise<string>;
   addPipelineItem: (item: Omit<PipelineItem, "id" | "updatedAt">) => PipelineItem;
   setPipelineStage: (id: string, stage: Stage) => void;
   advancePipeline: (id: string) => void;
@@ -311,6 +312,42 @@ export function ForgeProvider({ children }: { children: React.ReactNode }) {
             b.id === id ? { ...b, colors: { ...b.colors, ...colors } } : b
           ),
         })),
+
+      createBrand: async (input) => {
+        const draft: Brand = {
+          id: uid("brand"),
+          name: input.name.trim(),
+          tagline: input.tagline?.trim() ?? "",
+          industry: input.industry?.trim() ?? "",
+          colors: { ink: "#101014", paper: "#FAFAF7", accent: "#FF5A1F", muted: "#8B8B93" },
+          displayFont: "Space Grotesk",
+          bodyFont: "Inter",
+          tone: "",
+          voice: [],
+          banned: [],
+        };
+        setState((s) => ({
+          ...s,
+          brands: [...s.brands, draft],
+          activeBrandId: draft.id,
+        }));
+        if (modeRef.current === "cloud") {
+          try {
+            const r = await api.createBrand(draft);
+            if (r?.brand) {
+              setState((s) => ({
+                ...s,
+                brands: s.brands.map((b) => (b.id === draft.id ? r.brand : b)),
+                activeBrandId: s.activeBrandId === draft.id ? r.brand.id : s.activeBrandId,
+              }));
+              return r.brand.id;
+            }
+          } catch {
+            /* offline — the local draft stays */
+          }
+        }
+        return draft.id;
+      },
 
       addPipelineItem: (item) => {
         const full: PipelineItem = {

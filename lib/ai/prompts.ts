@@ -293,8 +293,8 @@ Output ONLY the JSON.`;
 /* model + sampling config                                             */
 /* ------------------------------------------------------------------ */
 
-export const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
-export const AI_MODEL_FALLBACK = "@cf/mistral/mistral-7b-instruct-v0.2";
+export const AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+export const AI_MODEL_FALLBACK = "@cf/mistralai/mistral-small-3.1-24b-instruct";
 
 /** Director's creativity slider (0–100) → model temperature (0.2–1.1). */
 export function creativityToTemperature(creativity: number): number {

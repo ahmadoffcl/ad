@@ -22,12 +22,32 @@ const SAMPLE = {
 };
 
 export default function BrandsPage() {
-  const { brands, activeBrandId, setActiveBrand, updateBrand, updateBrandColors } = useForge();
+  const { brands, activeBrandId, setActiveBrand, updateBrand, updateBrandColors, createBrand } = useForge();
   const [editingId, setEditingId] = useState<string>(activeBrandId);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newTagline, setNewTagline] = useState("");
+  const [newIndustry, setNewIndustry] = useState("");
+  const [createBusy, setCreateBusy] = useState(false);
   const brand = brands.find((b) => b.id === editingId) ?? brands[0];
   const sample = SAMPLE[brand.id as keyof typeof SAMPLE] ?? SAMPLE.kova;
 
   const set = (patch: Partial<typeof brand>) => updateBrand(brand.id, patch);
+
+  const submitNewBrand = async () => {
+    if (!newName.trim() || createBusy) return;
+    setCreateBusy(true);
+    try {
+      const id = await createBrand({ name: newName, tagline: newTagline, industry: newIndustry });
+      setEditingId(id);
+      setCreating(false);
+      setNewName("");
+      setNewTagline("");
+      setNewIndustry("");
+    } finally {
+      setCreateBusy(false);
+    }
+  };
 
   return (
     <div>
@@ -78,6 +98,47 @@ export default function BrandsPage() {
               );
             })}
           </div>
+          {creating ? (
+            <div className="mt-3 space-y-2.5 rounded-xl border border-molten/40 bg-molten-wash p-3.5">
+              <Field label="Brand name">
+                <input
+                  className="input"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Acme Studio"
+                  autoFocus
+                />
+              </Field>
+              <Field label="Tagline">
+                <input
+                  className="input"
+                  value={newTagline}
+                  onChange={(e) => setNewTagline(e.target.value)}
+                  placeholder="What you promise."
+                />
+              </Field>
+              <Field label="Industry">
+                <input
+                  className="input"
+                  value={newIndustry}
+                  onChange={(e) => setNewIndustry(e.target.value)}
+                  placeholder="Footwear"
+                />
+              </Field>
+              <div className="flex gap-2 pt-1">
+                <Btn size="sm" onClick={submitNewBrand} disabled={!newName.trim() || createBusy}>
+                  {createBusy ? "Forging…" : "Create brand"}
+                </Btn>
+                <Btn size="sm" variant="ghost" onClick={() => setCreating(false)}>
+                  Cancel
+                </Btn>
+              </div>
+            </div>
+          ) : (
+            <Btn size="sm" variant="ghost" className="mt-3 w-full" onClick={() => setCreating(true)}>
+              + New brand
+            </Btn>
+          )}
           <p className="px-2 pb-1 pt-3 text-[11px] leading-relaxed text-mist">
             The active brand feeds the studio, scheduler and analytics labels.
           </p>
