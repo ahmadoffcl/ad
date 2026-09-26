@@ -77,17 +77,24 @@ const update_campaign: CopilotTool = {
 
 const delete_campaign: CopilotTool = {
   name: "delete_campaign",
-  description: "Permanently delete a campaign and its concepts. Ask the user to confirm first.",
+  description: "Permanently delete a campaign and its concepts. Asks the user to confirm first — nothing is deleted until they say yes.",
   parameters: {
     campaignId: { type: "string", description: "Campaign id to delete.", required: true },
   },
   label: "Deleting campaign…",
-  needsConfirmation: true,
   async run(args, ctx) {
-    const blocked = needDb(ctx);
-    if (blocked) return blocked;
     const id = pick(args, ["campaignId", "campaign_id", "id"]);
     if (!id) return { ok: false, summary: "Which campaign? I need its id.", data: {} };
+    if (args.confirmed !== true) {
+      return {
+        ok: true,
+        needs_confirmation: true,
+        summary: `Delete this campaign and its concepts? This can't be undone.`,
+        data: { confirmCard: { title: "Delete campaign?", details: [`Campaign id: ${id}`, "Its concepts will be deleted too."] } },
+      };
+    }
+    const blocked = needDb(ctx);
+    if (blocked) return blocked;
     await ctx.db!.prepare("DELETE FROM concepts WHERE campaign_id = ?").bind(id).run();
     const r = await ctx.db!.prepare("DELETE FROM campaigns WHERE id = ? AND user_id = ?").bind(id, ctx.userId).run();
     if (!r.meta.changes) return { ok: false, summary: "Campaign not found.", data: {} };

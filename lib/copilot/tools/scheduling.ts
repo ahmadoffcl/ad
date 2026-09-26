@@ -52,13 +52,19 @@ const propose_week_schedule: CopilotTool = {
       "You are a social media strategist. Spread posts sensibly across the week.",
       `${brandLine(ctx.brand)}\nPropose ${n} posts for the week starting ${todayIso()}${focus ? ` around: ${focus}` : ""}.\nReply with JSON: {"posts": [{"day": "2026-10-01", "platform": "ig-reel", "title": "...", "hook": "..."}]}`
     );
-    const posts = (plan?.posts ?? []).slice(0, n);
-    if (!posts.length) return { ok: false, summary: "Couldn't plan the week right now.", data: {} };
+    const ideas = (plan?.posts ?? []).slice(0, n);
+    if (!ideas.length) return { ok: false, summary: "Couldn't plan the week right now.", data: {} };
+    const posts = ideas.map((p) => ({
+      title: p.title,
+      platform: p.platform || "ig-reel",
+      date: /^\d{4}-\d{2}-\d{2}$/.test(p.day) ? p.day : todayIso(),
+      time: "18:00",
+    }));
     return {
       ok: true,
       needs_confirmation: true,
       summary: `Proposed a ${posts.length}-post week — waiting for your confirmation.`,
-      data: { posts, brandId: ctx.brand.id, kind: "week_schedule" },
+      data: { posts, ideas, brandId: ctx.brand.id, kind: "week_schedule" },
     };
   },
 };
@@ -143,13 +149,12 @@ const cancel_scheduled: CopilotTool = {
 
 const auto_spread: CopilotTool = {
   name: "auto_spread",
-  description: "Evenly spread all queued posts across the next N days so nothing bunches up.",
+  description: "Evenly spread all queued posts across the next N days so nothing bunches up. Asks the user to confirm first.",
   parameters: {
     days: { type: "string", description: "Spread across how many days (default 7)." },
     time: { type: "string", description: "Posting time HH:MM (default 18:00)." },
   },
   label: "Spreading posts…",
-  needsConfirmation: true,
   async run(args, ctx) {
     const blocked = needDb(ctx);
     if (blocked) return blocked;
@@ -157,6 +162,14 @@ const auto_spread: CopilotTool = {
     if (!posts.length) return { ok: false, summary: "Nothing queued to spread.", data: {} };
     const days = Math.max(1, Math.min(30, parseInt(pick(args, ["days", "n"], "7"), 10) || 7));
     const time = pick(args, ["time", "at"]) || "18:00";
+    if (args.confirmed !== true) {
+      return {
+        ok: true,
+        needs_confirmation: true,
+        summary: `Spread ${posts.length} queued post(s) across ${days} days at ${time}?`,
+        data: { confirmCard: { title: "Spread the queue?", details: [`${posts.length} posts`, `Across ${days} days`, `Daily at ${time}`] } },
+      };
+    }
     const stmts = posts.map((p, i) => {
       const date = addDaysIso(todayIso(), Math.floor((i * days) / posts.length));
       return ctx.db!.prepare("UPDATE scheduled_posts SET scheduled_at = ? WHERE id = ?").bind(`${date}T${time}:00`, p.id);
@@ -205,7 +218,7 @@ const upcoming_posts: CopilotTool = {
 
 const schedule_recurring: CopilotTool = {
   name: "schedule_recurring",
-  description: "Schedule the same post idea on a recurring cadence (e.g. every Monday for 4 weeks).",
+  description: "Schedule the same post idea on a recurring cadence (e.g. every Monday for 4 weeks). Asks the user to confirm first.",
   parameters: {
     title: { type: "string", description: "Post title/idea.", required: true },
     platform: { type: "string", description: "Platform." },
@@ -214,10 +227,7 @@ const schedule_recurring: CopilotTool = {
     time: { type: "string", description: "Time HH:MM (default 18:00)." },
   },
   label: "Setting up recurring…",
-  needsConfirmation: true,
   async run(args, ctx) {
-    const blocked = needDb(ctx);
-    if (blocked) return blocked;
     const title = pick(args, ["title", "idea", "topic", "post"]);
     const weekday = pick(args, ["weekday", "day"]).toLowerCase();
     if (!title || !weekday) return { ok: false, summary: "I need the post idea and the weekday.", data: {} };
@@ -226,6 +236,16 @@ const schedule_recurring: CopilotTool = {
     if (target < 0) return { ok: false, summary: `Couldn't parse weekday "${weekday}".`, data: {} };
     const weeks = Math.max(1, Math.min(12, parseInt(pick(args, ["weeks", "n"], "4"), 10) || 4));
     const time = pick(args, ["time", "at"]) || "18:00";
+    if (args.confirmed !== true) {
+      return {
+        ok: true,
+        needs_confirmation: true,
+        summary: `Schedule "${title}" every ${weekday} for ${weeks} weeks at ${time}?`,
+        data: { confirmCard: { title: "Set up recurring posts?", details: [`"${title}"`, `Every ${weekday} · ${time}`, `${weeks} occurrences`] } },
+      };
+    }
+    const blocked = needDb(ctx);
+    if (blocked) return blocked;
     const platform = pick(args, ["platform", "network"]) || "ig-feed";
     const today = new Date(todayIso() + "T12:00:00Z");
     const dates: string[] = [];

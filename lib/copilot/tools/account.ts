@@ -139,17 +139,24 @@ const create_api_key: CopilotTool = {
 
 const revoke_api_key: CopilotTool = {
   name: "revoke_api_key",
-  description: "Revoke an API key by id or name.",
+  description: "Revoke an API key by id or name. Asks the user to confirm first.",
   parameters: {
     key: { type: "string", description: "Key id or name.", required: true },
   },
   label: "Revoking key…",
-  needsConfirmation: true,
   async run(args, ctx) {
-    const blocked = needDb(ctx);
-    if (blocked) return blocked;
     const q = pick(args, ["key", "id", "name", "keyId"]);
     if (!q) return { ok: false, summary: "Which key?", data: {} };
+    if (args.confirmed !== true) {
+      return {
+        ok: true,
+        needs_confirmation: true,
+        summary: `Revoke the API key "${q}"? Anything using it will stop working.`,
+        data: { confirmCard: { title: "Revoke API key?", details: [`Key: ${q}`, "This can't be undone."] } },
+      };
+    }
+    const blocked = needDb(ctx);
+    if (blocked) return blocked;
     const r = await ctx.db!.prepare("DELETE FROM api_keys WHERE user_id = ? AND (id = ? OR name = ?)").bind(ctx.userId, q, q).run();
     if (!r.meta.changes) return { ok: false, summary: "Key not found.", data: {} };
     return { ok: true, summary: "Key revoked.", data: {} };

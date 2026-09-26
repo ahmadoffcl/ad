@@ -307,10 +307,57 @@ export async function POST(req: Request): Promise<Response> {
         /* ---- pending confirmation flow ---- */
         if (typeof body.confirmed === "boolean") {
           const pending = thread.pending_action
-            ? (JSON.parse(thread.pending_action) as { type?: string; posts?: SchedulePostInput[]; brandId?: string; confirmId?: string })
+            ? (JSON.parse(thread.pending_action) as {
+                type?: string;
+                tool?: string;
+                args?: Record<string, unknown>;
+                posts?: SchedulePostInput[];
+                brandId?: string;
+                confirmId?: string;
+              })
             : null;
-          if (!pending || pending.type !== "schedule" || (body.confirmId && pending.confirmId !== body.confirmId)) {
-            fail("Nothing waiting for confirmation — the proposal may have expired. Ask me to schedule again.");
+          const confirmMismatch = body.confirmId && pending?.confirmId !== body.confirmId;
+          if (!pending || !["schedule", "tool"].includes(pending.type ?? "") || confirmMismatch) {
+            fail("Nothing waiting for confirmation — the proposal may have expired. Ask me to run it again.");
+            return;
+          }
+          const clearPending = async () => {
+            if (db && threadId !== "demo") {
+              await db
+                .prepare(`UPDATE copilot_threads SET pending_action = NULL, updated_at = datetime('now') WHERE id = ?`)
+                .bind(threadId)
+                .run();
+            }
+          };
+          /* ---- generic tool confirmation: re-run the tool with confirmed:true ---- */
+          if (pending.type === "tool" && pending.tool) {
+            if (body.confirmed) {
+              const brand = await resolveBrand(db, userId, pending.brandId);
+              const ctx: CopilotCtx = { userId, brand, db, ai, env: {} };
+              try {
+                const { result } = await runTool(
+                  pending.tool,
+                  { ...(pending.args ?? {}), confirmed: true },
+                  ctx
+                );
+                await clearPending();
+                const text = result.summary;
+                await saveMessage(db, threadId, "assistant", text);
+                send({ type: "message", text });
+              } catch (e) {
+                await clearPending();
+                const text = `That didn't go through: ${e instanceof Error ? e.message : String(e)}`;
+                await saveMessage(db, threadId, "assistant", text);
+                send({ type: "message", text });
+              }
+            } else {
+              await clearPending();
+              const text = "No problem — scrapped it. Say the word if you change your mind.";
+              await saveMessage(db, threadId, "assistant", text);
+              send({ type: "message", text });
+            }
+            send({ type: "done", threadId, title: thread.title });
+            controller.close();
             return;
           }
           if (body.confirmed) {
@@ -437,6 +484,31 @@ export async function POST(req: Request): Promise<Response> {
 
           if (toolRes.needs_confirmation) {
             const confirmId = newId("cnf");
+            const card = (toolRes.data as { confirmCard?: { title?: string; details?: string[] } } | undefined)?.confirmCard;
+            /* Generic tool confirmation (delete, recurring schedules, key revocation…) */
+            if (card?.title) {
+              const pending = {
+                type: "tool",
+                tool: def.name,
+                args: toolCall.args,
+                confirmId,
+                brandId: brand.id,
+              };
+              if (db && threadId !== "demo") {
+                await db
+                  .prepare(
+                    `UPDATE copilot_threads SET pending_action = ?, updated_at = datetime('now') WHERE id = ?`
+                  )
+                  .bind(JSON.stringify(pending), threadId)
+                  .run();
+              }
+              finalText = toolRes.summary;
+              send({ type: "confirm", id: confirmId, title: card.title, summary: toolRes.summary, details: card.details ?? [] });
+              await saveMessage(db, threadId, "assistant", finalText);
+              stoppedForConfirm = true;
+              break;
+            }
+            /* Schedule proposal (legacy shape) */
             const pending = {
               type: "schedule",
               confirmId,
