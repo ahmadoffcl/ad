@@ -19,13 +19,14 @@ import type { Brand, PlatformId } from "@/lib/types";
 import { getDb, getAI } from "@/lib/db";
 import { getSessionUser, readSessionCookie, newId } from "@/lib/auth";
 import { buildCopilotSystemPrompt, AI_MODEL, AI_MODEL_FALLBACK } from "@/lib/ai/prompts";
+import { buildToolCatalog } from "@/lib/copilot/tools";
 import { extractJson } from "@/lib/ai";
 import { COPILOT_TOOLS, runTool, executeSchedulePost, type CopilotCtx, type SchedulePostInput } from "@/lib/copilot/tools";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
-const MAX_STEPS = 6;
+const MAX_STEPS = 10;
 const HISTORY_LIMIT = 20;
 
 function sseEncode(obj: Record<string, unknown>): string {
@@ -356,6 +357,7 @@ export async function POST(req: Request): Promise<Response> {
         const system = buildCopilotSystemPrompt({
           userName: userName ?? body.userName,
           brandName: body.brandName ?? brand.name,
+          toolCatalog: buildToolCatalog(),
         });
 
         await saveMessage(db, threadId, "user", message);
@@ -413,7 +415,7 @@ export async function POST(req: Request): Promise<Response> {
           if (!def) {
             convo.push({
               role: "user",
-              content: `Tool result for ${toolCall.tool}: {"ok":false,"summary":"Unknown tool. Available tools: ${COPILOT_TOOLS.map((t) => t.name).join(", ")}"}`,
+              content: `Tool result for ${toolCall.tool}: {"ok":false,"summary":"Unknown tool. Call search_tools with a keyword to find the right one."}`,
             });
             continue;
           }

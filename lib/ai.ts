@@ -458,3 +458,34 @@ export async function captionAI(
     return fallback();
   }
 }
+
+/* ---------------- generic agent helpers ---------------- */
+
+/** Free-form text generation for agent tools. Returns "" when AI is unavailable. */
+export async function aiText(
+  ai: AiBinding | null,
+  system: string,
+  user: string,
+  temperature = 0.7,
+  maxTokens = 900
+): Promise<string> {
+  if (!ai) return "";
+  try {
+    return await runModel(ai, system, user, temperature, maxTokens);
+  } catch {
+    return "";
+  }
+}
+
+/** JSON generation for agent tools. Returns null when AI is unavailable or unparseable. */
+export async function aiJson<T>(
+  ai: AiBinding | null,
+  system: string,
+  user: string,
+  temperature = 0.7,
+  maxTokens = 900
+): Promise<T | null> {
+  const text = await aiText(ai, system, user + "\n\nReply with ONLY a JSON value, no prose.", temperature, maxTokens);
+  if (!text) return null;
+  return extractJson(text) as T | null;
+}

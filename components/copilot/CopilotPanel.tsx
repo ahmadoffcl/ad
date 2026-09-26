@@ -116,10 +116,13 @@ function SuggestionChips({
 export function CopilotPanel({
   variant = "panel",
   defaultThreadId,
+  bare = false,
 }: {
   variant?: "panel" | "full";
   /** Load an existing thread on mount (used by the full-page view). */
   defaultThreadId?: string | null;
+  /** Chromeless mode for the /app home — no card border, minimal header. */
+  bare?: boolean;
 }) {
   const { activeBrand, profile, pushActivity } = useForge();
   const [threadId, setThreadId] = useState<string | null>(defaultThreadId ?? null);
@@ -290,15 +293,29 @@ export function CopilotPanel({
   const empty = messages.length === 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-line bg-ink text-paper shadow-2xl">
+    <div
+      className={
+        bare
+          ? "flex h-full min-h-0 flex-col overflow-hidden bg-ink text-paper"
+          : "flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-line bg-ink text-paper shadow-2xl"
+      }
+    >
       {/* header */}
-      <div className="flex items-center gap-3 border-b border-line bg-ink-2/60 px-4 py-3">
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-molten font-display text-base font-bold text-ink"
-        >
-          F
-        </span>
+      <div
+        className={
+          bare
+            ? "flex items-center gap-3 px-1 py-2"
+            : "flex items-center gap-3 border-b border-line bg-ink-2/60 px-4 py-3"
+        }
+      >
+        {!bare && (
+          <span
+            aria-hidden="true"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-molten font-display text-base font-bold text-ink"
+          >
+            F
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <p className="font-display text-sm font-bold leading-tight">Forge</p>
           <p className="text-[11px] text-fog">Your ad agent · {activeBrand.name}</p>
@@ -359,7 +376,7 @@ export function CopilotPanel({
 
       {/* input */}
       <form
-        className="border-t border-line bg-ink-2/60 p-3"
+        className={bare ? "p-3" : "border-t border-line bg-ink-2/60 p-3"}
         onSubmit={(e) => {
           e.preventDefault();
           send(input);
