@@ -11,19 +11,26 @@ import {
 } from "react";
 import type {
   ActivityItem,
+  ApiKey,
+  AppNotification,
   Autopilot,
   Brand,
   ForgeSettings,
   Gate,
+  NotificationPrefs,
   PipelineItem,
+  Profile,
   ScheduledPost,
   Stage,
 } from "./types";
 import {
   SEED_ACTIVITY,
   SEED_ANALYTICS,
+  SEED_API_KEYS,
   SEED_BRANDS,
+  SEED_NOTIFICATIONS,
   SEED_PIPELINE,
+  SEED_PROFILE,
   SEED_SCHEDULED,
   SEED_TRENDS,
 } from "./seed";
@@ -47,6 +54,10 @@ interface ForgeState {
   activity: ActivityItem[];
   trends: TrendItem[];
   analytics: AnalyticsPost[];
+  profile: Profile;
+  apiKeys: ApiKey[];
+  notificationPrefs: NotificationPrefs;
+  notifications: AppNotification[];
 }
 
 interface ForgeContextValue extends ForgeState {
@@ -67,6 +78,15 @@ interface ForgeContextValue extends ForgeState {
   setConnection: (id: string, status: "connected" | "disconnected") => void;
   pushActivity: (text: string, kind: ActivityItem["kind"]) => void;
   resetDemo: () => void;
+  /* profile / account */
+  updateProfile: (patch: Partial<Profile>) => void;
+  generateApiKey: (name: string) => ApiKey;
+  revokeApiKey: (id: string) => void;
+  updateNotificationPrefs: (patch: Partial<NotificationPrefs>) => void;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  pushNotification: (n: Omit<AppNotification, "id" | "read">) => void;
+  unreadCount: number;
 }
 
 const ForgeContext = createContext<ForgeContextValue | null>(null);
@@ -85,6 +105,13 @@ function seedState(): ForgeState {
     activity: SEED_ACTIVITY,
     trends: SEED_TRENDS,
     analytics: SEED_ANALYTICS,
+    profile: { ...SEED_PROFILE, plan: SEED_PROFILE.plan as Profile["plan"] },
+    apiKeys: SEED_API_KEYS.map((k) => ({ ...k })),
+    notificationPrefs: { product: true, weekly: true, mentions: true, autopilot: true },
+    notifications: SEED_NOTIFICATIONS.map((n) => ({
+      ...n,
+      kind: n.kind as AppNotification["kind"],
+    })),
   };
 }
 
@@ -279,6 +306,56 @@ export function ForgeProvider({ children }: { children: React.ReactNode }) {
         }
         setState(seedState());
       },
+
+      updateProfile: (patch) =>
+        setState((s) => ({ ...s, profile: { ...s.profile, ...patch } })),
+
+      generateApiKey: (name) => {
+        const rand = () =>
+          Array.from({ length: 4 }, () =>
+            Math.floor(Math.random() * 36).toString(36)
+          ).join("");
+        const key: ApiKey = {
+          id: uid("k"),
+          name,
+          prefix: `af_live_${rand()}`,
+          created: "Just now",
+          lastUsed: "Never",
+        };
+        setState((s) => ({ ...s, apiKeys: [key, ...s.apiKeys] }));
+        return key;
+      },
+
+      revokeApiKey: (id) =>
+        setState((s) => ({ ...s, apiKeys: s.apiKeys.filter((k) => k.id !== id) })),
+
+      updateNotificationPrefs: (patch) =>
+        setState((s) => ({
+          ...s,
+          notificationPrefs: { ...s.notificationPrefs, ...patch },
+        })),
+
+      markNotificationRead: (id) =>
+        setState((s) => ({
+          ...s,
+          notifications: s.notifications.map((n) =>
+            n.id === id ? { ...n, read: true } : n
+          ),
+        })),
+
+      markAllNotificationsRead: () =>
+        setState((s) => ({
+          ...s,
+          notifications: s.notifications.map((n) => ({ ...n, read: true })),
+        })),
+
+      pushNotification: (n) =>
+        setState((s) => ({
+          ...s,
+          notifications: [{ ...n, id: uid("n"), read: false }, ...s.notifications].slice(0, 30),
+        })),
+
+      unreadCount: state.notifications.filter((n) => !n.read).length,
     };
   }, [state, pushActivity]);
 

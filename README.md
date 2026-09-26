@@ -27,9 +27,11 @@ Node ≥ 18.17 required. No environment variables needed for the MVP.
 | `/app/studio` | The creator — brief form → 3 scored concepts → detail with true-preview, layers, caption editor, Hook Score breakdown, Slop Shield, approve/schedule |
 | `/app/calendar` | Month scheduler with per-day counts, overload warnings and one-tap auto-spread |
 | `/app/analytics` | KPIs, hand-rolled reach chart, top-posts table, Memory learnings derived from real data |
-| `/app/radar` | Trend Radar — trending formats with "Use this trend" deep-links into the studio |
+| `/app/radar` | Trend Radar — trending formats with watchlist, filters and "Use this trend" deep-links into the studio |
 | `/app/brands` | Brand kit manager — palette, voice, banned words, live re-skin preview |
-| `/app/settings` | Platform connections (OAuth explained, never faked), autopilot gates, Slop Shield sensitivity |
+| `/app/settings` | Platform connections, autopilot gates, Slop Shield sensitivity, appearance (theme + density) |
+| `/app/profile` | Account area — profile editor, plan & usage, connections, notification prefs, API keys, appearance, danger zone |
+| `/app/more` | Mobile hub — quick links to Analytics, Brands, Settings, Profile + install-to-home-screen nudge |
 
 ### Killer features (real logic, no random numbers)
 
@@ -66,11 +68,14 @@ app/                 Next.js 14 App Router
     radar/           trends
     brands/          brand kits
     settings/        connections + autopilot + shield
-components/          Logo, ui kit, AppShell, PhoneMock, AdCanvas, ScoreBars, SlopPanel
+components/          Logo, ui kit, AppShell, PhoneMock, AdCanvas, ScoreBars, SlopPanel,
+                     CommandPalette, Notifications, Onboarding, ThemeToggle, AddToHome
 lib/
   types.ts           domain model
   seed.ts            fictional demo data (KOVA, Juniper & Co.)
   store.tsx          React context + localStorage persistence ("adforge-v1")
+  theme.tsx          dark/light theme provider + density + pre-paint init script
+  toast.tsx          global toast provider
   hookScore.ts       Hook Score engine
   slop.ts            Slop Shield engine
   campaign.ts        One-Brief Campaign generator + platform metadata
@@ -81,10 +86,20 @@ lib/
 `localStorage`. No backend in the MVP — deliberate, so the whole thing runs
 with `npm install && npm run dev`.
 
-**Design system:** dark premium. Ink `#0B0B0C`, paper `#FAFAF7`, molten orange
-`#FF5A1F` (solid, never neon), Space Grotesk display + Inter body via
-`next/font/google`. Mobile-first: sidebar nav on desktop, bottom tab bar on
-mobile.
+**Design system:** dual theme (dark premium default + warm paper light), persistent
+toggle, `prefers-color-scheme` on first run, pre-paint init script so the theme
+never flashes. Ink `#0B0B0C`, paper `#FAFAF7`, molten orange `#FF5A1F` (solid,
+never neon), Space Grotesk display + Inter body via `next/font/google`.
+Mobile-first: sidebar nav on desktop, five-tab bottom bar on mobile with
+safe-area insets, sticky blurred headers, and bottom-sheet modals — the `/app`
+shell behaves like an installed app. PWA-ready: `manifest.webmanifest`,
+maskable icons, Apple web-app meta, install nudge on the More tab.
+Comfortable/compact density toggle included.
+
+**App chrome:** ⌘K command palette (routes + actions), global toast system,
+notification center with mark-all-read, three-step first-run onboarding
+(`localStorage`), page transitions, press/hover micro-interactions and
+focus-visible rings throughout.
 
 ## Roadmap
 

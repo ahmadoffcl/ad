@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import AdCanvas from "@/components/AdCanvas";
@@ -5,6 +8,7 @@ import PhoneMock from "@/components/PhoneMock";
 import { Bar, Pill, ScoreRing } from "@/components/ui";
 import { SEED_BRANDS } from "@/lib/seed";
 import { scoreHook } from "@/lib/hookScore";
+import { useToast } from "@/lib/toast";
 
 const kova = SEED_BRANDS[0];
 
@@ -115,6 +119,28 @@ const PROOF = [
 
 export default function Landing() {
   const demo = scoreHook("Stop scrolling. The drop is live.", "Launch-week pricing. Shop the drop — link in bio.");
+  const { push } = useToast();
+  const heroRef = useRef<HTMLElement>(null);
+  const [pastHero, setPastHero] = useState(false);
+
+  // Mobile sticky CTA: appears once the hero has scrolled out of view.
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setPastHero(!entry.isIntersecting && entry.boundingClientRect.top < 0),
+      { threshold: 0 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const getApp = () =>
+    push("Opening the app", {
+      body: "The full studio, right in your browser.",
+      kind: "info",
+    });
+
   return (
     <div className="min-h-screen bg-ink text-paper">
       {/* nav */}
@@ -135,7 +161,7 @@ export default function Landing() {
       </header>
 
       {/* hero */}
-      <section className="relative overflow-hidden pt-32 pb-16 sm:pt-40 sm:pb-24">
+      <section ref={heroRef} className="relative overflow-hidden pt-32 pb-16 sm:pt-40 sm:pb-24">
         <video
           className="pointer-events-none absolute inset-0 h-full w-full object-cover"
           src="/media/hero-forge.mp4"
@@ -151,7 +177,7 @@ export default function Landing() {
         <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-5 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="stagger">
             <p className="kicker">The end-to-end ad studio</p>
-            <h1 className="h-display mt-4 text-[44px] leading-[0.98] sm:text-[72px]">
+            <h1 className="h-display mt-4 text-[54px] leading-[0.98] sm:text-[72px]">
               Ads people
               <br />
               don&apos;t <span className="text-molten">skip.</span>
@@ -167,6 +193,13 @@ export default function Landing() {
               <a href="#method" className="btn-ghost !px-7 !py-3.5 !text-base">
                 See the method
               </a>
+              <Link
+                href="/app"
+                onClick={getApp}
+                className="btn-ghost !px-7 !py-3.5 !text-base lg:hidden"
+              >
+                Get the app
+              </Link>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3">
               {[
@@ -446,6 +479,25 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      {/* mobile sticky CTA — appears after the hero scrolls away */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-40 transition-transform duration-300 lg:hidden ${
+          pastHero ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        <div className="border-t border-line bg-ink-2/95 backdrop-blur">
+          <div className="px-4 pb-safe pt-3">
+            <Link
+              href="/app/studio"
+              tabIndex={pastHero ? 0 : -1}
+              className="btn-primary w-full !py-3.5 !text-base"
+            >
+              Open the studio
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

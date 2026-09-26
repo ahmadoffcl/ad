@@ -114,7 +114,7 @@ export function ScoreRing({ score, size = 64 }: { score: number; size?: number }
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="#26262C" strokeWidth="6" fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--c-track)" strokeWidth="6" fill="none" />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -243,5 +243,92 @@ export function Field({
       {children}
       {hint && <p className="mt-1.5 text-xs text-mist">{hint}</p>}
     </div>
+  );
+}
+
+/* ---------- skeleton ---------- */
+
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`skeleton ${className}`} aria-hidden="true" />;
+}
+
+/* ---------- spinner ---------- */
+
+export function Spinner({ size = 20 }: { size?: number }) {
+  return (
+    <span
+      className="inline-block animate-spin rounded-full border-2 border-line border-t-molten"
+      style={{ width: size, height: size }}
+      role="status"
+      aria-label="Loading"
+    />
+  );
+}
+
+/* ---------- toggle ---------- */
+
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  description,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  description?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className="group flex w-full items-center justify-between gap-4 rounded-xl px-1 py-2.5 text-left"
+    >
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-paper">{label}</span>
+        {description && <span className="mt-0.5 block text-xs leading-relaxed text-fog">{description}</span>}
+      </span>
+      <span className="toggle" data-on={checked}>
+        <span className="toggle-knob" />
+      </span>
+    </button>
+  );
+}
+
+/* ---------- avatar ---------- */
+
+const AVATAR_SIZES = {
+  sm: "h-8 w-8 text-xs",
+  md: "h-10 w-10 text-sm",
+  lg: "h-16 w-16 text-2xl",
+} as const;
+
+export function Avatar({
+  name,
+  color,
+  size = "md",
+}: {
+  name: string;
+  color: string;
+  size?: keyof typeof AVATAR_SIZES;
+}) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+  return (
+    <span
+      role="img"
+      aria-label={name}
+      className={`inline-flex shrink-0 select-none items-center justify-center rounded-full font-display font-bold text-white ${AVATAR_SIZES[size]}`}
+      style={{ backgroundColor: color }}
+    >
+      {initials}
+    </span>
   );
 }

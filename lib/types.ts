@@ -196,3 +196,51 @@ export const GOALS = [
   { id: "awareness", label: "Awareness", hint: "Get the name out" },
   { id: "retention", label: "Retention", hint: "Bring them back" },
 ];
+
+/* ---------------- profile / account ---------------- */
+
+export interface Profile {
+  name: string;
+  handle: string;
+  workspace: string;
+  role: string;
+  plan: "Forge Pro" | "Forge Team" | "Forge Free";
+  avatarColor: string;
+  email: string;
+  timezone: string;
+}
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  created: string;
+  lastUsed: string;
+}
+
+export interface NotificationPrefs {
+  product: boolean;
+  weekly: boolean;
+  mentions: boolean;
+  autopilot: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  time: string;
+  kind: "info" | "success" | "warn";
+  read: boolean;
+}
+
+export const AVATAR_COLORS = [
+  "#FF5A1F",
+  "#D9A441",
+  "#34d399",
+  "#60a5fa",
+  "#f472b6",
+  "#a78bfa",
+  "#fbbf24",
+  "#94a3b8",
+];

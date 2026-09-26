@@ -32,15 +32,15 @@ function ReachChart({ data }: { data: { date: string; reach: number }[] }) {
         </linearGradient>
       </defs>
       {[0.25, 0.5, 0.75].map((f) => (
-        <line key={f} x1={P} x2={W - P} y1={H * f} y2={H * f} stroke="#26262C" strokeWidth="1" />
+        <line key={f} x1={P} x2={W - P} y1={H * f} y2={H * f} stroke="var(--c-track)" strokeWidth="1" />
       ))}
       <polygon points={`${P},${H - P} ${pts} ${W - P},${H - P}`} fill="url(#reachFill)" />
       <polyline points={pts} fill="none" stroke="#FF5A1F" strokeWidth="2.5" strokeLinejoin="round" />
       {data.map((d, i) => (
         <g key={d.date}>
-          <circle cx={xs(i)} cy={ys(d.reach)} r="4" fill="#0B0B0C" stroke="#FF5A1F" strokeWidth="2.5" />
+          <circle cx={xs(i)} cy={ys(d.reach)} r="4" fill="rgb(var(--c-ink-2))" stroke="#FF5A1F" strokeWidth="2.5" />
           {i % 2 === 0 && (
-            <text x={xs(i)} y={H - 8} textAnchor="middle" fill="#6E6E76" fontSize="10">
+            <text x={xs(i)} y={H - 8} textAnchor="middle" fill="rgb(var(--c-mist))" fontSize="10">
               {d.date.slice(5)}
             </text>
           )}

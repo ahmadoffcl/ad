@@ -5,6 +5,7 @@ import { useForge } from "@/lib/store";
 import { CONNECTIONS } from "@/lib/seed";
 import type { Autopilot } from "@/lib/types";
 import { Btn, Card, Modal, Pill, SectionHead } from "@/components/ui";
+import AppearanceCard from "@/components/AppearanceCard";
 
 const OAUTH_DOCS: Record<string, string> = {
   instagram: "https://developers.facebook.com/docs/instagram-platform",
@@ -157,6 +158,11 @@ export default function SettingsPage() {
           <span>Ruthless</span>
         </div>
       </Card>
+
+      {/* appearance */}
+      <div className="mb-4">
+        <AppearanceCard />
+      </div>
 
       {/* danger zone */}
       <Card className="border-red-500/20 p-5 sm:p-6">

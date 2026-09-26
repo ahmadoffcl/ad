@@ -306,3 +306,27 @@ export const CONNECTIONS = [
   { id: "youtube", label: "YouTube Shorts", note: "—", blurb: "Upload Shorts to the brand channel." },
   { id: "x", label: "X", note: "—", blurb: "Post text + 16:9 creative." },
 ];
+
+export const SEED_PROFILE = {
+  name: "Alex Carter",
+  handle: "@alexforges",
+  workspace: "Forge Studio",
+  role: "Founder · Growth",
+  plan: "Forge Pro",
+  avatarColor: "#FF5A1F",
+  email: "alex@forgestudio.co",
+  timezone: "Asia/Karachi (PKT)",
+} as const;
+
+export const SEED_API_KEYS = [
+  { id: "k1", name: "Production site", prefix: "af_live_9f2k", created: "Sep 12, 2026", lastUsed: "2h ago" },
+  { id: "k2", name: "Zapier bridge", prefix: "af_live_77qx", created: "Aug 28, 2026", lastUsed: "3d ago" },
+];
+
+export const SEED_NOTIFICATIONS = [
+  { id: "n1", title: "Autopilot posted 3 reels", body: "KOVA launch week — Instagram queue cleared on schedule.", time: "18m ago", kind: "success", read: false },
+  { id: "n2", title: "Hook Score milestone", body: "“Stop scrolling” crossed 90 — your highest scored hook this month.", time: "2h ago", kind: "success", read: false },
+  { id: "n3", title: "Trend alert: Silent unboxing", body: "Heat hit 94. 6 of your saved formats overlap — worth a brief.", time: "5h ago", kind: "info", read: false },
+  { id: "n4", title: "Slop Shield blocked 2 renders", body: "Text-legibility fail on the carousel cover. Fix and re-run.", time: "Yesterday", kind: "warn", read: true },
+  { id: "n5", title: "Weekly report is ready", body: "38M impressions tracked · +44% avg hook score shipped.", time: "Yesterday", kind: "info", read: true },
+];
