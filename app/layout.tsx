@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import "./globals.css";
+import { ForgeProvider } from "@/lib/store";
 import { ThemeProvider, themeInitScript } from "@/lib/theme";
 import { ToastProvider } from "@/lib/toast";
 
@@ -62,7 +63,9 @@ export default function RootLayout({
       </head>
       <body className="font-body">
         <ThemeProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ForgeProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </ForgeProvider>
         </ThemeProvider>
       </body>
     </html>
