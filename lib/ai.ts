@@ -59,6 +59,42 @@ interface DraftConcept {
 
 /* ---------------- low-level ---------------- */
 
+/** Coerce the many shapes Workers AI text models can return into plain text. */
+function coerceModelText(out: unknown): string {
+  if (typeof out === "string") return out;
+  if (!out || typeof out !== "object") return "";
+  const o = out as Record<string, unknown>;
+  const r = o.response;
+  if (typeof r === "string") return r;
+  if (r && typeof r === "object") {
+    const nested = (r as Record<string, unknown>).content ?? (r as Record<string, unknown>).text;
+    if (typeof nested === "string") return nested;
+  }
+  const choices = o.choices;
+  if (Array.isArray(choices) && choices.length > 0) {
+    const first = choices[0] as Record<string, unknown>;
+    const msg = first?.message as Record<string, unknown> | undefined;
+    const content = msg?.content;
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      return content
+        .map((p) => (typeof p === "string" ? p : String((p as Record<string, unknown>)?.text ?? "")))
+        .join("");
+    }
+    const delta = first?.delta as Record<string, unknown> | undefined;
+    if (typeof delta?.content === "string") return delta.content;
+  }
+  return "";
+}
+
+/** One-line shape hint for diagnostics (keys + value types, never values). */
+function shapeHint(out: unknown): string {
+  if (out === null || out === undefined) return String(out);
+  if (typeof out !== "object") return typeof out;
+  const keys = Object.keys(out as Record<string, unknown>).slice(0, 8);
+  return `{${keys.map((k) => `${k}:${typeof (out as Record<string, unknown>)[k]}`).join(",")}}`;
+}
+
 async function runModel(
   ai: AiBinding,
   system: string,
@@ -73,20 +109,18 @@ async function runModel(
   const opts = { messages, temperature, max_tokens: maxTokens };
   let firstErr: unknown = null;
   try {
-    const out = (await ai.run(AI_MODEL as never, opts as never)) as {
-      response?: string;
-    };
-    if (out?.response) return out.response;
-    firstErr = new Error(`primary model ${AI_MODEL} returned empty response`);
+    const out = await ai.run(AI_MODEL as never, opts as never);
+    const text = coerceModelText(out);
+    if (text) return text;
+    firstErr = new Error(`primary model ${AI_MODEL} returned unusable shape ${shapeHint(out)}`);
   } catch (e) {
     firstErr = e;
   }
   try {
-    const out2 = (await ai.run(AI_MODEL_FALLBACK as never, opts as never)) as {
-      response?: string;
-    };
-    if (out2?.response) return out2.response;
-    throw new Error(`fallback model ${AI_MODEL_FALLBACK} returned empty response`);
+    const out2 = await ai.run(AI_MODEL_FALLBACK as never, opts as never);
+    const text2 = coerceModelText(out2);
+    if (text2) return text2;
+    throw new Error(`fallback model ${AI_MODEL_FALLBACK} returned unusable shape ${shapeHint(out2)}`);
   } catch (e2) {
     const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 280);
     throw new Error(`AI models failed — primary: ${msg(firstErr)}; fallback: ${msg(e2)}`);
@@ -95,6 +129,7 @@ async function runModel(
 
 /** Extract the first balanced JSON object from model output. */
 export function extractJson(text: string): unknown | null {
+  if (typeof text !== "string" || !text) return null;
   const clean = text
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
